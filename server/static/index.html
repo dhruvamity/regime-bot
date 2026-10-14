@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold Trade Filter</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+  --good-ink: #006300; --warn-ink: #8a5a00; --crit-ink: #a52626;
+  --good-wash: rgba(12,163,12,0.10); --warn-wash: rgba(250,178,25,0.16); --crit-wash: rgba(208,59,59,0.10);
+  --up: #1baf7a; --down: #e34948; --accent: #2a78d6;
+  --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #184f95;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #242422;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --good-ink: #0ca30c; --warn-ink: #fab219; --crit-ink: #e66767;
+    --good-wash: rgba(12,163,12,0.16); --warn-wash: rgba(250,178,25,0.14); --crit-wash: rgba(208,59,59,0.18);
+    --up: #199e70; --down: #e66767; --accent: #3987e5;
+    --seq-1: #104281; --seq-2: #184f95; --seq-3: #1c5cab; --seq-4: #2a78d6; --seq-5: #5598e7; --seq-6: #86b6ef;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #242422;
+  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --good-ink: #0ca30c; --warn-ink: #fab219; --crit-ink: #e66767;
+  --good-wash: rgba(12,163,12,0.16); --warn-wash: rgba(250,178,25,0.14); --crit-wash: rgba(208,59,59,0.18);
+  --up: #199e70; --down: #e66767; --accent: #3987e5;
+  --seq-1: #104281; --seq-2: #184f95; --seq-3: #1c5cab; --seq-4: #2a78d6; --seq-5: #5598e7; --seq-6: #86b6ef;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 14px; }
+header h1 { font-size: 18px; margin: 0; font-weight: 650; }
+header .sub { color: var(--muted); font-size: 12px; }
+.price { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-2); font-size: 12px; margin-left: auto; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--muted); }
+.dot.ok { background: var(--good); } .dot.bad { background: var(--crit); }
+button.theme { background: var(--surface); color: var(--ink-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+.banner { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; color: var(--ink-2); }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.card h2 { font-size: 13px; font-weight: 650; margin: 0 0 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+.span-8 { grid-column: span 8; } .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
+@media (max-width: 980px) { .span-8, .span-4, .span-6 { grid-column: span 12; } }
+
+/* signal */
+.sig { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 700px) { .sig { grid-template-columns: 1fr; } }
+.pill { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 10px; font-size: 24px; font-weight: 750; letter-spacing: .01em; }
+.pill .ic { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 17px; font-weight: 800; flex: none; }
+.tier-GREEN .pill { background: var(--good-wash); color: var(--good-ink); } .tier-GREEN .pill .ic { background: var(--good); }
+.tier-AMBER .pill { background: var(--warn-wash); color: var(--warn-ink); } .tier-AMBER .pill .ic { background: var(--warn); color: #3a2a00; }
+.tier-RED .pill { background: var(--crit-wash); color: var(--crit-ink); } .tier-RED .pill .ic { background: var(--crit); }
+.advice { font-size: 15px; margin: 12px 0 4px; }
+.bias-line { color: var(--ink-2); margin-top: 6px; }
+.gauge { margin: 16px 0 6px; }
+.gauge .track { position: relative; height: 12px; border-radius: 6px; overflow: hidden; display: flex; }
+.gauge .seg { height: 100%; }
+.gauge .needle { position: absolute; top: -5px; width: 4px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-2px); box-shadow: 0 0 0 2px var(--surface); }
+.gauge .scale { position: relative; height: 16px; color: var(--muted); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.gauge .scale span { position: absolute; top: 0; }
+.gauge-wrap { position: relative; }
+.big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.subs { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 6px; }
+.subs .k { color: var(--muted); font-size: 12px; } .subs .v { font-size: 18px; font-weight: 650; }
+ul.reasons { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); } ul.reasons li { margin: 4px 0; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--ink-2); }
+.note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td .pct { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.scroll { overflow-x: auto; }
+.pbar { display: inline-block; width: 36px; height: 4px; border-radius: 2px; background: var(--grid); vertical-align: middle; margin-left: 6px; position: relative; overflow: hidden; }
+.pbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 2px; }
+.pbar.stack { display: block; width: 100%; margin: 3px 0 0; }
+#ltf td, #ltf th { padding: 6px 4px; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* htf */
+.htf-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--grid); }
+.htf-row:last-child { border-bottom: 0; }
+.arrow { font-weight: 700; }
+.bull { color: var(--good-ink); } .bear { color: var(--crit-ink); } .mixed { color: var(--ink-2); }
+
+/* charts */
+.tfbar { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+.tfbar button { background: var(--surface); border: 1px solid var(--border); color: var(--ink-2); border-radius: 6px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+.tfbar button.on { background: var(--surface-2); color: var(--ink); border-color: var(--axis); font-weight: 650; }
+#chart { height: 360px; } #scorechart { height: 130px; margin-top: 8px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-2); font-size: 12px; margin-top: 6px; align-items: center; }
+.ohlc { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: auto; }
+
+/* strips */
+.hours { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+.hours .c { height: 34px; border-radius: 4px; display: flex; align-items: flex-end; justify-content: center; font-size: 9px; letter-spacing: -.02em; color: var(--ink); padding-bottom: 2px; cursor: default; }
+.hours .c.now { outline: 2px solid var(--ink); outline-offset: 1px; }
+.days { display: flex; flex-wrap: wrap; gap: 2px; }
+.days .d { width: 30px; height: 30px; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 650; cursor: default; }
+.days .d.GREEN { background: var(--good); } .days .d.AMBER { background: var(--warn); color: #3a2a00; } .days .d.RED { background: var(--crit); }
+.cal { display: grid; gap: 3px; align-items: center; }
+.cal .c { aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); cursor: default; min-width: 0; }
+.cal .c.GREEN { background: var(--good); } .cal .c.AMBER { background: var(--warn); } .cal .c.RED { background: var(--crit); }
+.cal .c.none { background: transparent; outline: 1px dashed var(--grid); outline-offset: -1px; }
+.cal .c.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cal .wd, .cal .mo { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.cal .mo { align-self: end; overflow: visible; }
+.calwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 20px; align-items: start; }
+@media (max-width: 1100px) { .calwrap { grid-template-columns: 1fr; } }
+.tip { position: fixed; pointer-events: none; z-index: 50; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.18); display: none; max-width: 280px; white-space: pre-line; }
+select { background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font: inherit; font-size: 12px; }
+.md { max-height: 560px; overflow: auto; color: var(--ink-2); }
+.md table { font-size: 12px; } .md h1 { font-size: 18px; color: var(--ink); } .md h2 { font-size: 15px; color: var(--ink); margin-top: 18px; }
+.md td, .md th { white-space: nowrap; text-align: left; }
+.loading { color: var(--muted); padding: 40px; text-align: center; }
+footer { color: var(--muted); font-size: 12px; margin: 18px 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Gold Trade Filter · XAUUSDT</h1>
+      <div class="sub">Should I trade gold right now? Same engine as the 10-month backtest · forex.com session hours</div>
+    </div>
+    <div class="price" id="price">–</div>
+    <div class="meta">
+      <span><span class="dot" id="feeddot"></span><span id="feed">connecting…</span></span>
+      <span id="asof">–</span>
+      <button class="theme" id="themebtn" type="button">Theme</button>
+    </div>
+  </header>
+  <div class="banner" id="banner" style="display:none"></div>
+
+  <div class="grid" id="app">
+    <section class="card span-8" id="sigcard">
+      <div class="loading">Loading the latest candles and computing the signal…</div>
+    </section>
+    <section class="card span-4">
+      <h2>Higher-timeframe bias</h2>
+      <div id="htf"></div>
+    </section>
+
+    <section class="card span-8">
+      <h2>Price (session candles) and the hourly signal</h2>
+      <div class="tfbar" id="tfbar">
+        <button data-tf="1m">1m</button><button data-tf="5m" class="on">5m</button><button data-tf="15m">15m</button><button data-tf="1h">1h</button>
+        <span class="ohlc" id="ohlc"></span>
+      </div>
+      <div id="chart"></div>
+      <div id="scorechart"></div>
+      <div class="legend">
+        <span>Hourly signal score:</span>
+        <span class="tag"><span class="sw" style="background:var(--good)"></span>✓ TRADE ≥55</span>
+        <span class="tag"><span class="sw" style="background:var(--warn)"></span>! SELECTIVE 35–55</span>
+        <span class="tag"><span class="sw" style="background:var(--crit)"></span>✕ NO TRADE &lt;35</span>
+        <span class="ohlc" id="scorehover"></span>
+      </div>
+    </section>
+    <section class="card span-4">
+      <h2>LTF structure right now (last 4h)</h2>
+      <div id="ltf"></div>
+    </section>
+
+    <section class="card span-6">
+      <h2>Today vs last week (same hours into the session)</h2>
+      <div id="today"></div>
+    </section>
+    <section class="card span-6">
+      <h2>When gold usually moves (your local time)</h2>
+      <div id="hours"></div>
+      <h2 style="margin-top:18px">Last 6 weeks · avg London+NY score per day</h2>
+      <div id="daily"></div>
+    </section>
+
+    <section class="card span-12">
+      <h2>Last 6 months · avg London+NY score per day</h2>
+      <div id="daily6m"></div>
+    </section>
+
+    <section class="card span-6">
+      <h2>How reliable is this? (walk-forward backtest)</h2>
+      <div id="bt"></div>
+    </section>
+    <section class="card span-6">
+      <h2>Last week in context</h2>
+      <div id="week"></div>
+    </section>
+
+    <section class="card span-12">
+      <h2>Telegram alerts</h2>
+      <div id="tgcard"></div>
+    </section>
+
+    <section class="card span-12">
+      <div class="tfbar" id="reptabs"><button data-r="week_report.md" class="on">Week report</button><button data-r="backtest.md">Backtest report</button><button data-r="alerts_backtest.md">Alert backtest</button><button data-r="candle_check.md">Candle accuracy</button></div>
+      <div class="md" id="report"></div>
+    </section>
+  </div>
+  <footer>
+    Data: Binance XAUUSDT perpetual 1m candles (live websocket + stored history), using only forex.com XAUUSD hours
+    (Sun 18:00 → Fri 17:00 ET, daily break 17:00–18:00 ET). When the session is closed the reading is based on the final
+    in-session candles. R figures assume a 1-ATR stop and $0.40 spread/cost per trade. Not financial advice.
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (x, d = 2) => (x === null || x === undefined || Number.isNaN(x)) ? "–" : Number(x).toFixed(d);
+const sgn = (x, d = 2) => (x === null || x === undefined) ? "–" : (x > 0 ? "+" : "") + Number(x).toFixed(d);
+const ord = (n) => { if (n === null || n === undefined) return "–"; n = Math.round(n); const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+const ICON = { GREEN: "✓", AMBER: "!", RED: "✕" };
+let STATE = null, TF = "5m", chart, candleSeries, scoreChart, scoreSeries, lastBar = null;
+
+// theme toggle (stored per viewer)
+(function () {
+  let saved = null; try { saved = localStorage.getItem("theme"); } catch (e) {}
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("themebtn").onclick = () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const nxt = cur === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = nxt;
+    try { localStorage.setItem("theme", nxt); } catch (e) {}
+    restyleCharts(); if (STATE) render(STATE);
+  };
+})();
+
+// tooltip
+const tip = $("tip");
+document.addEventListener("mousemove", (e) => {
+  const t = e.target.closest("[data-tip]");
+  if (!t) { tip.style.display = "none"; return; }
+  tip.textContent = t.dataset.tip; tip.style.display = "block";
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+});
+
+function localTime(sec, withDay) {
+  const d = new Date(sec * 1000);
+  return d.toLocaleString(undefined, withDay ? { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false } : { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function chartOpts(h) {
+  return {
+    height: h, autoSize: true,
+    layout: { background: { type: "solid", color: css("--surface") }, textColor: css("--muted"), fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif" },
+    grid: { vertLines: { color: css("--grid") }, horzLines: { color: css("--grid") } },
+    rightPriceScale: { borderColor: css("--axis") },
+    timeScale: { borderColor: css("--axis"), timeVisible: true, secondsVisible: false,
+      tickMarkFormatter: (t, type) => type <= 2 ? new Date(t * 1000).toLocaleDateString(undefined, { day: "2-digit", month: "short" }) : localTime(t, false) },
+    handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+    handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
+    localization: { timeFormatter: (t) => localTime(t, true) },
+    crosshair: { mode: 0 },
+  };
+}
+function initCharts() {
+  chart = LightweightCharts.createChart($("chart"), chartOpts(360));
+  candleSeries = chart.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
+  chart.subscribeCrosshairMove((p) => {
+    const d = p && p.seriesData && p.seriesData.get(candleSeries);
+    $("ohlc").textContent = d ? `${localTime(p.time, true)}  O ${fmt(d.open)}  H ${fmt(d.high)}  L ${fmt(d.low)}  C ${fmt(d.close)}` : "";
+  });
+  scoreChart = LightweightCharts.createChart($("scorechart"), { ...chartOpts(130), rightPriceScale: { borderColor: css("--axis"), scaleMargins: { top: 0.05, bottom: 0 } } });
+  scoreSeries = scoreChart.addHistogramSeries({ priceFormat: { type: "price", precision: 0, minMove: 1 }, base: 0 });
+  scoreSeries.createPriceLine({ price: 35, color: css("--axis"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "" });
+  scoreSeries.createPriceLine({ price: 55, color: css("--axis"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "" });
+  scoreChart.subscribeCrosshairMove((p) => {
+    const d = p && p.seriesData && p.seriesData.get(scoreSeries);
+    if (!d) { $("scorehover").textContent = ""; return; }
+    const h = (STATE?.history || []).find((x) => x.t === p.time);
+    $("scorehover").textContent = `${localTime(p.time, true)} · score ${fmt(d.value, 0)}${h ? " · " + h.tier : ""}`;
+  });
+}
+function restyleCharts() {
+  if (!chart) return;
+  chart.applyOptions(chartOpts(360)); scoreChart.applyOptions(chartOpts(130));
+  candleSeries.applyOptions({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down") });
+}
+async function loadCandles() {
+  const n = { "1m": 600, "5m": 500, "15m": 400, "1h": 400 }[TF];
+  const data = await (await fetch(`/api/candles?tf=${TF}&n=${n}`)).json();
+  candleSeries.setData(data);
+  lastBar = data.length ? { ...data[data.length - 1] } : null;
+}
+$("tfbar").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tf]"); if (!b) return;
+  TF = b.dataset.tf; [...$("tfbar").querySelectorAll("button")].forEach((x) => x.classList.toggle("on", x === b)); loadCandles();
+});
+const TFSEC = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600 };
+function applyTick(t) {
+  $("price").textContent = fmt(t.price);
+  if (!lastBar || !STATE || !STATE.session_open) return;
+  const bucket = Math.floor(t.t / TFSEC[TF]) * TFSEC[TF];
+  if (bucket === lastBar.time) {
+    lastBar.high = Math.max(lastBar.high, t.h); lastBar.low = Math.min(lastBar.low, t.l); lastBar.close = t.price;
+  } else if (bucket > lastBar.time) {
+    lastBar = { time: bucket, open: t.o, high: t.h, low: t.l, close: t.price };
+  } else return;
+  candleSeries.update(lastBar);
+}
+
+function gauge(score, th) {
+  const r = th.red_below, g = th.green_from;
+  const pos = Math.max(0, Math.min(100, score ?? 0));
+  return `<div class="gauge"><div class="gauge-wrap"><div class="track">
+      <div class="seg" style="width:${r}%;background:var(--crit);opacity:.55"></div>
+      <div class="seg" style="width:${g - r}%;background:var(--warn);opacity:.55;margin-left:2px"></div>
+      <div class="seg" style="flex:1;background:var(--good);opacity:.55;margin-left:2px"></div></div>
+      <div class="needle" style="left:${pos}%"></div></div>
+    <div class="scale"><span style="left:0">0</span><span style="left:${r}%;transform:translateX(-50%)">${r}</span><span style="left:${g}%;transform:translateX(-50%)">${g}</span><span style="right:0">100</span></div></div>`;
+}
+
+function render(s) {
+  STATE = s;
+  const sig = s.signal;
+  $("price").textContent = fmt(s.price);
+  $("asof").textContent = `Reading as of ${s.as_of.ist} · ${s.as_of.et}`;
+  const b = $("banner");
+  if (s.session_note) { b.style.display = "block"; b.textContent = s.session_note; } else b.style.display = "none";
+  setFeed(s.feed);
+
+  const hq = sig.hour_quality;
+  const hqText = hq ? `Current hour (${hq.ist} local) is historically <b>${hq.quality}</b>: avg next-4h range $${fmt(hq.range4h, 0)}` : "";
+  const biasCls = s.bias === "LONG" ? "bull" : s.bias === "SHORT" ? "bear" : "mixed";
+  $("sigcard").className = `card span-8 tier-${sig.tier}`;
+  $("sigcard").innerHTML = `
+    <div class="sig">
+      <div>
+        <h2>Signal right now</h2>
+        <div class="pill"><span class="ic">${ICON[sig.tier]}</span>${sig.title}</div>
+        <div class="advice">${sig.advice}</div>
+        <div class="bias-line">HTF bias: <b class="${biasCls}">${s.bias}</b> · LTF structure: <b>${s.ltf_label}</b> (trend quality ${fmt(s.trend_q, 0)}/100)</div>
+        ${gauge(sig.score, sig.thresholds)}
+        <div class="subs">
+          <div><div class="k">Score</div><div class="big">${fmt(sig.score, 0)}</div></div>
+          <div><div class="k">Movement (65%)</div><div class="v">${fmt(sig.move, 0)}</div></div>
+          <div><div class="k">Recent edge (35%)</div><div class="v">${fmt(sig.edge, 0)}</div></div>
+        </div>
+      </div>
+      <div>
+        <h2>Why</h2>
+        <ul class="reasons">${sig.reasons.map((r) => `<li>${r}</li>`).join("")}</ul>
+        ${sig.how_to_exit_red ? `<p class="note" style="color:var(--ink-2)">${sig.how_to_exit_red}</p>` : ""}
+        ${hqText ? `<p class="note" style="color:var(--ink-2)">${hqText}</p>` : ""}
+        <p class="note">Score = 65% movement vs normal + 35% how recent trades with the 1h bias resolved. Trending vs choppy is
+        shown as live context: in the backtest it could not be forecast, while low movement could.</p>
+      </div>
+    </div>`;
+
+  // HTF
+  const rows = ["1h", "4h", "1d"].filter((t) => s.htf[t]).map((t) => {
+    const h = s.htf[t]; const cls = h.label === "Bullish" ? "bull" : h.label === "Bearish" ? "bear" : "mixed";
+    const ar = h.dir > 0 ? "▲" : h.dir < 0 ? "▼" : "•";
+    return `<div class="htf-row"><b>${t}</b><div><span class="arrow ${cls}">${ar} ${h.label}</span>
+      <div class="note" style="margin:0">EMA20 ${fmt(h.ema20, 1)} · EMA50 ${fmt(h.ema50, 1)} · close ${fmt(h.close, 1)}</div></div>
+      <span class="chip" data-tip="ADX(14) on closed ${t} candles. ≥25 strong trend, <18 weak.">ADX ${fmt(h.adx, 0)} · ${h.strength}</span></div>`;
+  }).join("");
+  $("htf").innerHTML = rows + `<p class="note">${s.htf.aligned ? "All three timeframes agree." : "Timeframes disagree. LTF trades against the 4h/1d have less room."} Uses closed candles only (no repaint). 4h/1d candles start at the 18:00 ET open like forex.com.</p>`;
+
+  // LTF
+  const pctCell = (v, p, d, inv) => `<td data-tip="${ord(p)} percentile vs the last 6 months${inv ? " (higher = choppier)" : ""}">${fmt(v, d)}<span class="pbar stack"><i style="width:${p ?? 0}%"></i></span></td>`;
+  $("ltf").innerHTML = `<div class="scroll"><table><thead><tr><th>TF</th><th data-tip="Net move ÷ distance travelled (10 bars). Higher = cleaner trend.">Efficiency</th><th data-tip="Choppiness Index (14). Higher = choppier.">Chop</th><th data-tip="Share of each candle that is wick. Higher = more rejection / stop hunts.">Wick</th><th data-tip="Variance ratio: >1 moves follow through, <1 they snap back.">Follow</th><th data-tip="Average true range in $">ATR $</th></tr></thead><tbody>
+    ${["1m", "5m", "15m"].map((t) => { const d = s.ltf[t]; return `<tr><td><b>${t}</b></td>${pctCell(d.er, d.er_pct, 2)}${pctCell(d.chop, d.chop_pct, 0, true)}${pctCell(d.wick, d.wick_pct, 2, true)}${pctCell(d.vr, d.vr_pct, 2)}${pctCell(d.atr, d.atr_pct, 2)}</tr>`; }).join("")}
+    </tbody></table></div>
+    <p class="note">Bars show the percentile vs the last 6 months (hover for detail). This describes the last 4 hours. It isn't a forecast.</p>`;
+
+  // today vs last week
+  const T = s.today_vs_last_week;
+  const NAMES = { range: "Range so far ($)", net: "Net move ($)", atr_1m: "1m ATR ($)", atr_5m: "5m ATR ($)", er_5m: "5m efficiency", chop_5m: "5m choppiness", wick_5m: "5m wick share", vr_5m: "5m follow-through", y2_1m: "1m trades 1:2 (R)", y2_5m: "5m trades 1:2 (R)", y1_1m: "1m trades 1:1 (R)", y1_5m: "5m trades 1:1 (R)" };
+  const isR = (k) => k.startsWith("y");
+  $("today").innerHTML = `<p class="note" style="margin-top:0">Session ${T.today}, first ${fmt(T.elapsed_hours, 1)}h vs the same ${fmt(T.elapsed_hours, 1)}h of last week's sessions (${T.last_week_days.length} days) and of every session in the last 6 months.</p>
+    <div class="scroll"><table><thead><tr><th>Metric</th><th>Today</th><th>Last wk</th><th>6-mo med</th><th data-tip="Today's percentile vs every session in the last 6 months at the same point">Pctl</th></tr></thead><tbody>
+    ${T.rows.map((r) => `<tr><td>${NAMES[r.key] || r.key}</td><td><b>${isR(r.key) ? sgn(r.today) : fmt(r.today, r.key.startsWith("atr") || r.key.startsWith("er") || r.key.startsWith("wick") || r.key.startsWith("vr") ? 2 : 1)}</b></td><td>${isR(r.key) ? sgn(r.last_week) : fmt(r.last_week, 2)}</td><td>${isR(r.key) ? sgn(r.median_6m) : fmt(r.median_6m, 2)}</td><td>${ord(r.pct_6m)}<span class="pbar stack"><i style="width:${r.pct_6m ?? 0}%"></i></span></td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="note">"Trades" = every bar entered in the 1h-bias direction with a 1-ATR stop, net of $0.40 cost. Only trades already resolved are counted.</p>`;
+
+  // hours
+  const hrs = (s.hours || []).slice().sort((a, b) => a.ist.localeCompare(b.ist));
+  const vals = hrs.map((h) => h.netR); const lo = Math.min(...vals), hi = Math.max(...vals);
+  const seq = ["--seq-1", "--seq-2", "--seq-3", "--seq-4", "--seq-5", "--seq-6"];
+  $("hours").innerHTML = `<div class="hours">${hrs.map((h) => {
+      const k = hi > lo ? Math.min(5, Math.floor((h.netR - lo) / (hi - lo) * 6)) : 3;
+      const txt = k >= 3 ? "#fff" : "var(--ink)";
+      const now = hq && hq.hour_et === h.hour_et ? " now" : "";
+      return `<div class="c${now}" style="background:var(${seq[k]});color:${txt}" data-tip="${h.ist} local (${h.et} ET)\nAvg range next 4h: $${fmt(h.range4h, 0)}\nAvg trend-follow result next 4h: ${sgn(h.netR)}R\nRated: ${h.quality}">${h.ist}</div>`;
+    }).join("")}</div>
+    <div class="legend"><span>Worse</span>${seq.map((c) => `<span class="sw" style="background:var(${c})"></span>`).join("")}<span>Better hour to trade (last 6 months)</span><span class="chip">outlined = now</span></div>`;
+
+  // daily strip
+  $("daily").innerHTML = `<div class="days">${(s.daily || []).map((d) => {
+      const t = d.score >= sig.thresholds.green_from ? "GREEN" : d.score >= sig.thresholds.red_below ? "AMBER" : "RED";
+      return `<div class="d ${t}" data-tip="${d.label}\nAvg score ${fmt(d.score, 0)} → ${t}\nHourly signals 03–13 ET: ${d.green} trade · ${d.amber} selective · ${d.red} no-trade">${d.label.slice(4, 6)}</div>`;
+    }).join("")}</div>
+    <div class="legend"><span class="tag"><span class="sw" style="background:var(--good)"></span>✓ trade</span><span class="tag"><span class="sw" style="background:var(--warn)"></span>! selective</span><span class="tag"><span class="sw" style="background:var(--crit)"></span>✕ no-trade</span><span>number = day of month</span></div>`;
+
+  // 6-month calendar
+  renderCalendar(s.daily_6m || [], s.daily_6m_summary || [], s.today_vs_last_week?.today, sig.thresholds);
+
+  // backtest
+  renderBacktest(s.backtest);
+  // week
+  const w = s.week_report;
+  $("week").innerHTML = w ? `<p>Week of <b>${w.week}</b> had the <b>quietest average daily range of ${w.weeks_in_rank} weeks</b> (rank ${w.rank_quietest}, 1 = quietest).</p>
+    <p>Weeks like it in the 6 months before (bottom-20% movement <i>and</i> below-median LTF results):
+    <b>${w.like_last_week_6m.length}</b>: ${w.like_last_week_6m.join(", ") || "none"}. That's about 1 week in ${Math.round(26 / Math.max(1, w.like_last_week_6m.length))}.</p>
+    <p>Days with a range at or below last week's average: <b>${w.quiet_days} of ${w.base_days}</b> sessions (${Math.round(w.quiet_days / w.base_days * 100)}%).</p>
+    <p class="note">Full detail in the Week report below.</p>` : "Run scripts/analyze_week.py to generate.";
+
+  // telegram
+  const tgs = s.telegram || {};
+  const KIND = { CONDITIONS_GREEN: "🟢 Trade conditions ON", CONDITIONS_ON: "🟡 Selective (silent)", CONDITIONS_DOWN: "🟡 Downgraded (silent)", CONDITIONS_OFF: "🔴 Stop trading", SHIFT: "🔄 Trend shift" };
+  const ra = s.recent_alerts || [];
+  $("tgcard").innerHTML = `<p style="margin-top:0"><span class="dot ${tgs.configured && String(tgs.status).startsWith("connected") ? "ok" : "bad"}"></span>
+      ${tgs.configured ? `Bot ${tgs.bot ? "@" + tgs.bot : ""}: ${tgs.status} · ${tgs.subscribers ?? 0} subscribed chat(s)` : "Telegram not set up yet: add TELEGRAM_BOT_TOKEN to .env and restart (see README). Alerts are still computed and logged to data/alerts.log."}</p>
+    ${ra.length ? `<div class="scroll"><table><thead><tr><th>When (local)</th><th>Alert</th><th>TF</th><th>Direction</th><th>vs higher TF</th><th>Score</th></tr></thead><tbody>
+      ${ra.map((a) => `<tr><td>${localTime(Date.parse(a.time) / 1000, true)}</td><td>${KIND[a.kind] || a.kind}</td><td>${a.tf || ""}</td><td>${a.dir === 1 ? "▲ bullish" : a.dir === -1 ? "▼ bearish" : ""}</td><td>${a.tag ? a.tag.toLowerCase() : ""}</td><td>${a.score != null ? fmt(a.score, 0) : ""}</td></tr>`).join("")}
+      </tbody></table></div>` : `<p class="note">No alerts since the server started. They fire on closed 15-min checks and 1h/4h/1d candle closes.</p>`}`;
+
+  // score chart
+  if (scoreSeries) {
+    const colors = { GREEN: css("--good"), AMBER: css("--warn"), RED: css("--crit") };
+    scoreSeries.setData((s.history || []).map((h) => ({ time: h.t, value: h.score, color: colors[h.tier] })));
+    scoreChart.timeScale().fitContent();
+  }
+}
+
+function renderCalendar(days, summary, today, th) {
+  if (!days.length) { $("daily6m").innerHTML = '<p class="note">Not enough history yet.</p>'; return; }
+  const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
+  const parse = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const iso = (dt) => dt.toISOString().slice(0, 10);
+  const first = parse(days[0].date), last = parse(days[days.length - 1].date);
+  const start = new Date(first); start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7)); // Monday
+  const weeks = [];
+  for (let w = new Date(start); w <= last; w.setUTCDate(w.getUTCDate() + 7)) weeks.push(new Date(w));
+  const LBL = { GREEN: "✓ trade", AMBER: "! selective", RED: "✕ no-trade" };
+  let cells = `<div></div>`;
+  // month labels: first column, then every week whose Monday falls on the 1st-7th
+  weeks.forEach((w, i) => {
+    const lab = (i === 0 || w.getUTCDate() <= 7) ? w.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) : "";
+    cells += `<div class="mo">${lab}</div>`;
+  });
+  ["Mon", "Tue", "Wed", "Thu", "Fri"].forEach((wd, r) => {
+    cells += `<div class="wd">${wd}</div>`;
+    weeks.forEach((w) => {
+      const d = new Date(w); d.setUTCDate(d.getUTCDate() + r);
+      const key = iso(d), x = byDate[key];
+      if (d < first || d > last) { cells += `<div></div>`; return; }
+      if (!x) { cells += `<div class="c none" data-tip="${d.toUTCString().slice(0, 11)}\nNo session (holiday / closed)"></div>`; return; }
+      const live = key === today ? "\n(today, still in progress)" : "";
+      const tip = `${x.label}${live}\nAvg score ${fmt(x.score, 0)} → ${LBL[x.tier]}\nHourly signals 03–13 ET: ${x.green} trade · ${x.amber} selective · ${x.red} no-trade\nDay range: $${fmt(x.range, 0)}\nWhat happened (London+NY): 1:2 trades ${sgn(x.realized_r2)}R · 1:1 ${sgn(x.realized_r1)}R`;
+      cells += `<div class="c ${x.tier}${key === today ? " today" : ""}" data-tip="${tip}"></div>`;
+    });
+  });
+  const counts = Object.fromEntries(summary.map((r) => [r.tier, r]));
+  const sumRows = ["GREEN", "AMBER", "RED"].map((t) => { const r = counts[t] || {}; const col = { GREEN: "--good", AMBER: "--warn", RED: "--crit" }[t];
+    return `<tr><td><span class="tag"><span class="sw" style="background:var(${col})"></span>${LBL[t]}</span></td><td>${r.days ?? 0}</td><td>$${fmt(r.avg_range, 0)}</td><td>${sgn(r.realized_r2)}</td></tr>`; }).join("");
+  $("daily6m").innerHTML = `<div class="calwrap">
+    <div><div class="cal" style="grid-template-columns: 30px repeat(${weeks.length}, minmax(0, 1fr))">${cells}</div>
+      <div class="legend"><span class="tag"><span class="sw" style="background:var(--good)"></span>✓ trade ≥${th.green_from}</span><span class="tag"><span class="sw" style="background:var(--warn)"></span>! selective</span><span class="tag"><span class="sw" style="background:var(--crit)"></span>✕ no-trade &lt;${th.red_below}</span><span class="tag"><span class="sw" style="outline:1px dashed var(--axis)"></span>no session</span><span class="chip">outlined = today</span></div></div>
+    <div><div class="scroll"><table><thead><tr><th>Day colour</th><th>Days</th><th data-tip="Average high-low range of those sessions">Avg range</th><th data-tip="Average net R of 1:2 trend-following entries (1h bias) during London+NY on those days">1:2 R</th></tr></thead><tbody>${sumRows}</tbody></table></div>
+      <p class="note">What those days actually delivered. The R columns are mechanical entries on every candle after costs, so they're negative. Compare the colours: green days moved more and lost much less than red days. Hover a day for its numbers.</p></div>
+  </div>`;
+}
+
+let btPart = "TEST (out-of-sample)";
+function renderBacktest(bt) {
+  if (!bt) { $("bt").textContent = "Run scripts/backtest.py to generate."; return; }
+  const t = bt[btPart] || {};
+  const base = bt.base_rates || {};
+  const rowsB = ["GREEN", "AMBER", "RED"].filter((k) => t[k]).map((k) => {
+    const r = t[k]; const lab = { GREEN: "✓ Trade", AMBER: "! Selective", RED: "✕ No trade" }[k];
+    const col = { GREEN: "--good", AMBER: "--warn", RED: "--crit" }[k];
+    return `<tr><td><span class="tag"><span class="sw" style="background:var(${col})"></span>${lab}</span></td><td>${fmt(r.share_of_time, 0)}%</td><td>${sgn(r.net_R_1to2, 3)}</td><td>${sgn(r.net_R_1to1, 3)}</td><td>${fmt(r.next4h_range, 0)}</td><td>${fmt(r.bad_4h_pct, 0)}%</td></tr>`;
+  }).join("");
+  $("bt").innerHTML = `<div class="tfbar"><select id="btsel">${["TEST (out-of-sample)", "TRAIN", "ALL"].map((p) => `<option ${p === btPart ? "selected" : ""}>${p}</option>`).join("")}</select>
+      <span class="note" style="margin:0">Split at ${String(bt.split || "").slice(0, 10)}. Test period never used to design the rules.</span></div>
+    <div class="scroll"><table><thead><tr><th>Signal</th><th data-tip="Share of hours in this state">Time</th><th data-tip="Average net R per entry over the next 4h, 1:2 RR, 1m+5m+15m, entries with the 1h bias">R 1:2</th><th data-tip="Same with 1:1 RR">R 1:1</th><th data-tip="Average high-low range over the next 4h">Range $</th><th data-tip="Share of 4h windows where results averaged worse than -0.25R">Bad 4h</th></tr></thead><tbody>${rowsB}</tbody></table></div>
+    <p class="note">Next-4h outcomes after each hourly signal. How to read this: the R columns are for mechanical entries at every bar, so all are negative after costs. What matters is the <i>difference</i>. NO TRADE hours were consistently the worst (train and test). TRADE beat NO TRADE in 9 of 10 months, but in the test period TRADE and SELECTIVE were about equal. Treat RED as the reliable warning.</p>`;
+  $("btsel").onchange = (e) => { btPart = e.target.value; renderBacktest(bt); };
+}
+
+function setFeed(f) {
+  if (!f) return;
+  const ok = f.status === "connected" && f.last_msg && (Date.now() / 1000 - f.last_msg) < 120;
+  $("feeddot").className = "dot " + (ok ? "ok" : f.status === "connected" ? "" : "bad");
+  $("feed").textContent = ok ? "Live feed connected" : f.status === "connected" ? "Connected, waiting for data" : f.status;
+}
+
+// reports
+async function loadReport(name) {
+  const txt = await (await fetch("/reports/" + name)).text();
+  $("report").innerHTML = window.marked ? marked.parse(txt) : `<pre>${txt.replace(/</g, "&lt;")}</pre>`;
+}
+$("reptabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-r]"); if (!b) return;
+  [...$("reptabs").querySelectorAll("button")].forEach((x) => x.classList.toggle("on", x === b)); loadReport(b.dataset.r);
+});
+
+// live connection
+let lastCandleReload = 0;
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  let ping;
+  ws.onopen = () => { ping = setInterval(() => ws.readyState === 1 && ws.send("ping"), 25000); };
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === "state") {
+      render(m.data);
+      if (Date.now() - lastCandleReload > 20000) { lastCandleReload = Date.now(); loadCandles(); }
+    } else if (m.type === "tick") { applyTick(m.data); setFeed(m.feed); }
+  };
+  ws.onclose = () => { clearInterval(ping); $("feeddot").className = "dot bad"; $("feed").textContent = "Disconnected from server, retrying…"; setTimeout(connect, 3000); };
+}
+
+(async function main() {
+  if (window.LightweightCharts) initCharts(); else $("chart").innerHTML = '<p class="note">Chart library failed to load (offline?). Signal still works.</p>';
+  try { const s = await (await fetch("/api/state")).json(); if (!s.loading) render(s); } catch (e) {}
+  if (chart) loadCandles();
+  loadReport("week_report.md");
+  connect();
+})();
+</script>
+</body>
+</html>

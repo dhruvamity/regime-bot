@@ -1,0 +1,17 @@
+# For true 24/7 on a Linux VPS (a laptop sleeps; a $5/month server doesn't).
+#   sudo cp deploy/gold-filter.service /etc/systemd/system/ && sudo systemctl enable --now gold-filter
+# Edit User and WorkingDirectory below to match where you copied the project.
+[Unit]
+Description=Gold trade filter + Telegram alert bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/regime-bot
+ExecStart=/usr/bin/python3 -m uvicorn server.app:app --host 127.0.0.1 --port 8787
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

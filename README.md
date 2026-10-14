@@ -334,6 +334,8 @@ hovering near the line doesn't flip every day.
   was quiet (movement under 80% of normal) **40%** of the time vs 21% after a NORMAL one. From any evening 5m close,
   $16.5 was reached within an hour 40% of the time vs 45%, and $9 75% vs 82%. The old rule's split on the same months
   was 48% vs 22% on fewer days (25), so the change trades a little precision for coverage.
+* **Since Sep 2023** (794 sessions, 175 quiet under this rule): next evening quiet 39% vs 18%; within an hour $16.5 was
+  reached 20% of the time vs 30%, and $9 55% vs 69%. The old rule gave nearly the same split on 115 quiet sessions.
 * What it does **not** show: random entries aiming at $16.5 did not lose more in quiet mode (the stop gets hit less
   often too). Since Sep 2023 random entries ranked 1:2 > 1:3 > 1:5.5 by a few hundredths of R in both modes alike.
   The $9 cap is a hit-rate rule for a quiet market, not a proven expectancy gain. On your own

@@ -119,19 +119,20 @@ def main():
         "# Quiet-mode backtest",
         "",
         f"Sessions {res['first']} to {res['last']} ({res['sessions']}), Binance XAUUSDT perp, forex.com hours. "
-        f"Mode = average daily range of the last 3 sessions vs the 60-session median: QUIET below "
+        f"Mode = average daily range of the last {regime.LOOKBACK} sessions vs the {regime.NORMAL_WINDOW}-session median: QUIET below "
         f"{regime.QUIET_BELOW:.2f}, back to NORMAL at {regime.QUIET_EXIT:.2f}. Each session is judged by the mode "
         "known before it opened; outcomes are for the 17:00-24:00 IST evening.",
         "",
         md_table(t, "{:.2f}"),
         "",
-        f"Mode flips (alerts) over the period: {flips} with the 0.75/0.80 buffer, {flips_plain} with a single 0.75 line.",
+        f"Mode flips (alerts) over the period: {flips} with the {regime.QUIET_BELOW:.2f}/{regime.QUIET_EXIT:.2f} buffer, "
+        f"{flips_plain} with a single {regime.QUIET_BELOW:.2f} line.",
         "",
         "Reach columns: how often a far target gets hit at all. R columns: random entries (no edge by design, "
         "no costs), which show whether a far target also cost expectancy in that mode. In quiet mode the stop "
         "gets hit less often too, so fewer far targets does not automatically mean lower R.",
         "",
-        f"Now: **{now['mode']}** (ratio {now['ratio']:.2f}, last 3 ranges {now['last3']}, normal ${now['normal']:.0f})." if now else "",
+        f"Now: **{now['mode']}** (ratio {now['ratio']:.2f}, last {regime.LOOKBACK} ranges {now['lastN']}, normal ${now['normal']:.0f})." if now else "",
         "",
         f"_Computed in {time.time() - t0:.0f}s._",
     ]

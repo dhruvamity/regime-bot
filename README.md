@@ -7,7 +7,7 @@ A local website and Telegram bot that answer one question for an intraday gold t
   shows the 1h/4h/1d bias, live LTF structure, today vs last week, best hours of the day, a 6-week strip and a 6-month
   calendar of daily signals, plus backtest and data-accuracy reports.
 * **Telegram bot**: bold alerts when trade conditions switch on or off and when the 1h trend shifts, plus 4h/1d bias
-  changes and a daily brief. It also tracks **quiet mode**: when the last 3 sessions moved less than 75% of a normal
+  changes and a daily brief. It also tracks **quiet mode**: when the last 2 sessions moved less than 80% of a normal
   day, it warns you to cap targets at $9 (1:3 on a $3 stop). Commands: `/status`, `/bias`, `/mode` and more.
 * **Research scripts**: a walk-forward backtest of the signal, a backtest of every alert, a deep week-vs-history
   report, and a check that every timeframe matches the exchange.
@@ -151,7 +151,7 @@ Real environment variables override `.env`. Changes take effect after a restart.
 | 🟡 Tradable (selective) / downgraded | Score moves into the 32–58 band | silent |
 | 🔄 **1H TREND SHIFT** | A closed 1h candle breaks the last swing high/low (BOS/CHoCH), tagged with/against the 4h trend | loud |
 | 🔄 **4H / 1D BIAS CHANGE** | The same on 4h or 1d candles (information, not an entry signal) | loud |
-| 🌙 **QUIET MODE ON** / ☀️ OFF | The 3-session average daily range drops below 75% of the 60-session median (off again at 80%). Checked once per closed session | loud |
+| 🌙 **QUIET MODE ON** / ☀️ OFF | The 2-session average daily range drops below 80% of the 60-session median (off again at 90%). Checked once per closed session | loud |
 | ⚠️ Feed stalled / ✅ restored | No candles for 3 minutes during market hours, and when they return | loud |
 | ☀️ Daily brief | `BRIEF_TIME_IST` on weekdays | loud |
 | 🔁 Bot restarted | When the server restarts and someone is subscribed | silent |
@@ -322,26 +322,30 @@ current figures.
   result (next-4h 1:2 R −0.06 vs −0.17, p=0.33), and quiet mode and STOP agree: in quiet mode the state was STOP 94%
   of the time and never TRADE.
 
-**Quiet mode** (`gold/regime.py`, added 14 Oct 2026). Average daily range of the last 3 complete sessions divided
-by the median of the last 60. Below 0.75 = QUIET; it switches back at 0.80 so a reading hovering near the line
-doesn't flip every day.
-* It predicts quiet evenings: after a QUIET reading the next 17:00–24:00 IST evening was quiet (movement under 80% of
-  normal) **48%** of the time vs 22% after a NORMAL one (bot data, Mar–Oct 2026, 25 quiet sessions). The same rule on
-  PAXG + perp data from Sep 2023 (794 sessions, 115 quiet): 43% vs 19%.
-* Far targets get hit less: from any evening 5m close, $16.5 was reached within an hour **38%** of the time in quiet
-  mode vs 45% normally, and $9 73% vs 81%. Since Sep 2023: $16.5 19% vs 29%, $9 53% vs 68%.
+**Quiet mode** (`gold/regime.py`, added 14 Oct 2026, rule changed the same day). Average daily range of the last 2
+complete sessions divided by the median of the last 60. Below 0.80 = QUIET; it switches back at 0.90, so a reading
+hovering near the line doesn't flip every day.
+* **Why 2 sessions at 0.80/0.90.** The first version (3 sessions, 0.75/0.80) caught too few quiet days. Settings were
+  compared on Sep 2023 – Jun 2025 and confirmed on Jul 2025 – Oct 2026 (PAXG before Dec 2025, then the perp). The new
+  rule flagged 34–43% of the sessions that turned out quiet (old: 19–31%). Of the sessions it flagged, about 46% were
+  quiet vs a 20–23% base rate, the same precision as before. It caught all 18 quiet stretches since Sep 2023
+  (3+ sessions in a row under 80% of normal), usually 1–2 sessions in. The old rule caught 15, usually 2–3 sessions in.
+* **On the bot's own data** (Mar–Oct 2026, 43 quiet sessions): after a QUIET reading the next 17:00–24:00 IST evening
+  was quiet (movement under 80% of normal) **40%** of the time vs 21% after a NORMAL one. From any evening 5m close,
+  $16.5 was reached within an hour 40% of the time vs 45%, and $9 75% vs 82%. The old rule's split on the same months
+  was 48% vs 22% on fewer days (25), so the change trades a little precision for coverage.
 * What it does **not** show: random entries aiming at $16.5 did not lose more in quiet mode (the stop gets hit less
   often too). Since Sep 2023 random entries ranked 1:2 > 1:3 > 1:5.5 by a few hundredths of R in both modes alike.
   The $9 cap is a hit-rate rule for a quiet market, not a proven expectancy gain. On your own
   entries 1:3 was the best target in normal markets; too few of your trades fell in quiet mode to test the cap.
-* The flag lags: it usually switches on 2–3 sessions into a quiet stretch. Since Sep 2023 it caught 15 of 18 quiet
-  stretches (3+ sessions in a row under 80% of normal), 12 of them 2–3 sessions in. Quiet stretches are short, so the
-  3 sessions after a QUIET ON alert averaged a normal range (1.00×). Read the mode as "today is likely quieter than
-  usual", not "the next week will be quiet".
-* Flips: 21 in 156 sessions; about half reversed after one session (one big day lifts the 3-day average).
-* Verified on 14 Oct 2026 with `scripts/verify_alerts.py`: every flip over 120 days was sent once, at the close of
-  the session that caused it. (That check caught and fixed a bug where 13:29 ET was treated as a session close on
-  every day, not only on early-close days.)
+* It describes today, not the week: quiet stretches are short, and the 3 sessions after a QUIET ON alert averaged a
+  normal range (1.02× since Sep 2023). Read the mode as "today is likely quieter than usual".
+* Alerts: about 12–15 flips per 100 sessions since 2023, and 33 in the bot's 156 sessions (Mar–Oct 2026), so roughly
+  one every 5 trading days in choppy months. Each flip is sent once, loud, at the session close (02:30 IST in summer,
+  so it usually lands in your quiet hours). The current mode is also in `/status`, `/mode` and the daily brief.
+* Verified on 14 Oct 2026 with `scripts/verify_alerts.py`: every flip over 120 days (19 with this rule) was sent
+  once, at the close of the session that caused it. That check caught and fixed a bug where 13:29 ET was treated as
+  a session close on every day, not only on early-close days.
 
 **Candle accuracy** (`reports/candle_check.md`): no missing minutes in 30 days. Stored 1m and our 5m/15m/1h are
 identical to Binance's own candles, and our forex.com-anchored 4h/1d match Binance 1h data aggregated over the same
@@ -358,7 +362,7 @@ windows.
 | Session hours (18:00 → 17:00 ET) | `gold/config.py` |
 | Signal tiers (`TIER_RED = 35`, `TIER_GREEN = 55`), score weights | `gold/signal.py` |
 | Alert thresholds (`VIABLE_ON/OFF = 38/32`, `GREEN_ON/OFF = 58/52`, `CONFIRM_SLOTS = 2`), shift timeframes | `gold/alerts.py` |
-| Quiet mode (`QUIET_BELOW = 0.75`, `QUIET_EXIT = 0.80`, `LOOKBACK = 3`, `NORMAL_WINDOW = 60`, `QUIET_TARGET_CAP = 9`) | `gold/regime.py` |
+| Quiet mode (`QUIET_BELOW = 0.80`, `QUIET_EXIT = 0.90`, `LOOKBACK = 2`, `NORMAL_WINDOW = 60`, `QUIET_TARGET_CAP = 9`) | `gold/regime.py` |
 | Port | the `--port` in your start command, `scripts/install_autostart.sh` and `deploy/gold-filter.service` |
 
 After changing signal, alert or quiet-mode rules, re-run `scripts/backtest.py`, `scripts/backtest_alerts.py` and
@@ -391,7 +395,7 @@ regime-bot/
 │   ├── trend.py                Trend definitions (structure, EMA, Supertrend, Donchian), 1m follow-through tester
 │   ├── alerts.py               Alert rules + Telegram message formatting
 │   ├── alert_runner.py         Persistent live wrapper (no duplicates or stale alerts after restarts)
-│   ├── regime.py               Quiet mode: 3-session range vs normal, target cap, bot texts
+│   ├── regime.py               Quiet mode: 2-session range vs normal, target cap, bot texts
 │   ├── telegram.py             Telegram client: retrying sender, command polling, owner-only access
 │   └── util.py                 Markdown table helper
 ├── scripts/

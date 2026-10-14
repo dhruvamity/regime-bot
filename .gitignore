@@ -5,3 +5,14 @@ __pycache__/
 .venv/
 .DS_Store
 reports/*.pkl
+
+# rebuilt by the server every day (and on first start), so not tracked
+reports/backtest.md
+reports/backtest.json
+reports/week_report.md
+reports/week_report.json
+reports/alerts_backtest.md
+reports/alerts_backtest.json
+reports/alert_stats.json
+reports/regime_backtest.md
+reports/regime_backtest.json

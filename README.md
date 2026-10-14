@@ -268,6 +268,7 @@ internet. Telegram works without opening any port.
 | `python scripts/analyze_week.py [YYYY-MM-DD]` | ~3 s | `reports/week_report.md/.json` | A week (give its Monday; default = last full week) vs the previous 3 weeks and 6 months, on every timeframe, plus today vs last week |
 | `python scripts/backtest_alerts.py` | ~3 s | `reports/alerts_backtest.md/.json`, `reports/alert_stats.json` | Replays every alert through the bot's own code. **`alert_stats.json` is what the bot quotes in messages** |
 | `python scripts/backtest_regime.py` | ~70 s | `reports/regime_backtest.md/.json` | Replays the quiet-mode flag session by session and judges the next evening (17:00–24:00 IST). **The bot quotes these numbers in `/mode` and quiet-mode alerts** |
+| `python scripts/verify_alerts.py [--days 30]` | ~30 min | `reports/alert_check.md` | Replays the live bot's code at every 15-minute candle close (only the candles it would have had), with a restart and a 3-hour outage, and checks every alert and quiet-mode flip against the backtests: nothing missing, extra, duplicated, late or stale. Exit code 1 on any mismatch |
 | `python scripts/verify_candles.py` | ~3 s | `reports/candle_check.md` | Checks for missing minutes; stored 1m vs Binance; our 5m/15m/1h vs Binance native klines; our 4h/1d vs Binance 1h aggregated over the same windows. Exit code 1 on any mismatch |
 
 ## 8. HTTP endpoints
@@ -312,8 +313,14 @@ current figures.
   the selection period, so both kinds are sent.
 * 15m trend shifts were coin flips under every definition tested (structure, EMA, Supertrend, Donchian), so they're
   not alerted. 4h/1d shifts are too rare (≤ 20 in 6 months) to prove an edge.
-* The live bot sends exactly the alerts the backtest replays. This was checked alert-for-alert across a simulated
-  restart.
+* The live bot sends exactly the alerts the backtest replays: `scripts/verify_alerts.py` replays the live code every
+  15 minutes for 30 days, with a restart and a 3-hour outage (69 of 69 alerts on 14 Oct 2026; none missing,
+  duplicated, late or leaked after the outage).
+* What the states mean in practice (last 6 months, from each 15-minute check): in TRADE, a $9 move happened within an
+  hour 79% of the time, in SELECTIVE 67%, in STOP 62% (TRADE vs STOP p=0.004), and the next-4h range was $38.6 /
+  $36.3 / $32.0. So the tiers sort **how much gold moves**. They don't significantly sort the direction-following
+  result (next-4h 1:2 R −0.06 vs −0.17, p=0.33), and quiet mode and STOP agree: in quiet mode the state was STOP 94%
+  of the time and never TRADE.
 
 **Quiet mode** (`gold/regime.py`, added 14 Oct 2026). Average daily range of the last 3 complete sessions divided
 by the median of the last 60. Below 0.75 = QUIET; it switches back at 0.80 so a reading hovering near the line
@@ -327,7 +334,14 @@ doesn't flip every day.
   often too). Since Sep 2023 random entries ranked 1:2 > 1:3 > 1:5.5 by a few hundredths of R in both modes alike.
   The $9 cap is a hit-rate rule for a quiet market, not a proven expectancy gain. On your own
   entries 1:3 was the best target in normal markets; too few of your trades fell in quiet mode to test the cap.
-* The flag lags: it usually switches on 2–3 sessions into a quiet stretch. It flipped 21 times in 156 sessions.
+* The flag lags: it usually switches on 2–3 sessions into a quiet stretch. Since Sep 2023 it caught 15 of 18 quiet
+  stretches (3+ sessions in a row under 80% of normal), 12 of them 2–3 sessions in. Quiet stretches are short, so the
+  3 sessions after a QUIET ON alert averaged a normal range (1.00×). Read the mode as "today is likely quieter than
+  usual", not "the next week will be quiet".
+* Flips: 21 in 156 sessions; about half reversed after one session (one big day lifts the 3-day average).
+* Verified on 14 Oct 2026 with `scripts/verify_alerts.py`: every flip over 120 days was sent once, at the close of
+  the session that caused it. (That check caught and fixed a bug where 13:29 ET was treated as a session close on
+  every day, not only on early-close days.)
 
 **Candle accuracy** (`reports/candle_check.md`): no missing minutes in 30 days. Stored 1m and our 5m/15m/1h are
 identical to Binance's own candles, and our forex.com-anchored 4h/1d match Binance 1h data aggregated over the same

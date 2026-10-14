@@ -22,7 +22,7 @@ import json
 
 import pandas as pd
 
-from .config import REPORTS_DIR
+from .config import EARLY_CLOSE_DATES, ET, REPORTS_DIR, SESSION_CLOSE_HOUR_ET
 
 LOOKBACK = 3          # sessions averaged
 NORMAL_WINDOW = 60    # sessions in the "normal" median
@@ -43,9 +43,13 @@ def session_ranges(s1m: pd.DataFrame) -> pd.Series:
     d.index = pd.to_datetime(d.index.astype(str))
     d = d.sort_index()
     if len(d):
-        last_end = d.end.iloc[-1].tz_convert("America/New_York")
-        # a session is complete once its 16:59 ET candle is in (or 13:29 ET on early-close days)
-        if not (last_end.hour == 16 and last_end.minute == 59) and not (last_end.hour == 13 and last_end.minute == 29):
+        # the last session counts only once its final candle is in: 16:59 ET, or 13:29 ET on the listed
+        # early-close days. (Checking 13:29 on every day made each 13:30 ET reading treat a half-finished
+        # session as complete.)
+        last_end = d.end.iloc[-1].tz_convert(ET)
+        close_hr = EARLY_CLOSE_DATES.get(d.index[-1].strftime("%Y-%m-%d"), SESSION_CLOSE_HOUR_ET)
+        final = pd.Timestamp(d.index[-1].date()).tz_localize(ET) + pd.Timedelta(hours=close_hr) - pd.Timedelta(minutes=1)
+        if last_end < final:
             d = d.iloc[:-1]
     return d.rng[d.n >= MIN_BARS]
 

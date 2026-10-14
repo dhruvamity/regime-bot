@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-12 20:43:02.472876+05:30",
+ "generated": "2026-10-14 13:54:31.085200+05:30",
  "conditions": {
   "selection (5 Jan-12 Apr)": {
    "states": {
@@ -66,25 +66,25 @@
   "LAST 6 MONTHS (13 Apr-now)": {
    "states": {
     "\ud83d\udfe2 TRADE": {
-     "share": 18.4789,
+     "share": 18.2501,
      "next4h_R_1to2": -0.0597,
      "next4h_R_1to1": -0.0968,
      "next4h_range": 38.6117,
-     "better_than_median": 54.6811
+     "better_than_median": 54.7716
     },
     "\ud83d\udfe1 SELECTIVE": {
-     "share": 31.1241,
+     "share": 30.7388,
      "next4h_R_1to2": -0.1183,
      "next4h_R_1to1": -0.1385,
      "next4h_range": 36.3175,
-     "better_than_median": 51.2889
+     "better_than_median": 51.3695
     },
     "\ud83d\udd34 STOP": {
-     "share": 50.397,
-     "next4h_R_1to2": -0.1655,
-     "next4h_R_1to1": -0.1683,
-     "next4h_range": 32.3215,
-     "better_than_median": 47.4627
+     "share": 51.0111,
+     "next4h_R_1to2": -0.1659,
+     "next4h_R_1to1": -0.1711,
+     "next4h_range": 32.0327,
+     "better_than_median": 47.4595
     }
    },
    "alerts": {
@@ -94,7 +94,7 @@
      "next4h_R_1to1": -0.0898,
      "next4h_range": 32.2342,
      "better_than_median": 51.5152,
-     "per_week": 1.2692
+     "per_week": 1.2554
     },
     "CONDITIONS_GREEN": {
      "n": 33,
@@ -102,7 +102,7 @@
      "next4h_R_1to1": -0.0824,
      "next4h_range": 39.7633,
      "better_than_median": 63.6364,
-     "per_week": 1.2692
+     "per_week": 1.2554
     },
     "CONDITIONS_OFF": {
      "n": 53,
@@ -110,7 +110,7 @@
      "next4h_R_1to1": -0.1583,
      "next4h_range": 33.3513,
      "better_than_median": 45.283,
-     "per_week": 2.0385
+     "per_week": 2.0163
     },
     "CONDITIONS_ON": {
      "n": 53,
@@ -118,12 +118,12 @@
      "next4h_R_1to1": -0.2231,
      "next4h_range": 34.0281,
      "better_than_median": 43.3962,
-     "per_week": 2.0385
+     "per_week": 2.0163
     }
    },
    "precision_on": 51.162790697674424,
    "precision_off": 54.71698113207547,
-   "per_week": 6.615384615384615
+   "per_week": 6.543478260869565
   }
  },
  "shifts": {
@@ -135,10 +135,10 @@
     "per_week": 0.0722,
     "hit +1R first %": 100.0,
     "hit +2R first %": 0.0,
-    "random +1R %": 24.6377,
-    "random +2R %": 10.1449,
+    "random +1R %": 26.087,
+    "random +2R %": 8.6957,
     "avg R (1:2)": 1.256,
-    "random R": 0.121,
+    "random R": 0.1814,
     "median best move (R)": 1.3491,
     "flip back fast %": 0.0
    },
@@ -191,10 +191,10 @@
     "per_week": 0.3608,
     "hit +1R first %": 60.0,
     "hit +2R first %": 40.0,
-    "random +1R %": 43.932,
-    "random +2R %": 21.3592,
+    "random +1R %": 41.7476,
+    "random +2R %": 19.4175,
     "avg R (1:2)": 0.63,
-    "random R": 0.1238,
+    "random R": 0.0258,
     "median best move (R)": 1.6789,
     "flip back fast %": 0.0
    },
@@ -205,10 +205,10 @@
     "per_week": 0.0722,
     "hit +1R first %": 100.0,
     "hit +2R first %": 0.0,
-    "random +1R %": 43.932,
-    "random +2R %": 21.3592,
+    "random +1R %": 41.7476,
+    "random +2R %": 19.4175,
     "avg R (1:2)": 0.8515,
-    "random R": 0.1238,
+    "random R": 0.0258,
     "median best move (R)": 1.3071,
     "flip back fast %": 0.0
    },
@@ -219,10 +219,10 @@
     "per_week": 0.2165,
     "hit +1R first %": 0.0,
     "hit +2R first %": 0.0,
-    "random +1R %": 43.932,
-    "random +2R %": 21.3592,
+    "random +1R %": 41.7476,
+    "random +2R %": 19.4175,
     "avg R (1:2)": -0.797,
-    "random R": 0.1238,
+    "random R": 0.0258,
     "median best move (R)": 0.5437,
     "flip back fast %": 0.0
    }
@@ -232,98 +232,98 @@
     "tf": "1d",
     "type": "ALL",
     "n": 2,
-    "per_week": 0.0769,
+    "per_week": 0.0761,
     "hit +1R first %": 50.0,
     "hit +2R first %": 0.0,
-    "random +1R %": 20.7692,
-    "random +2R %": 3.0769,
+    "random +1R %": 21.9697,
+    "random +2R %": 3.7879,
     "avg R (1:2)": -0.0241,
-    "random R": -0.0359,
+    "random R": -0.0178,
     "median best move (R)": 0.6722,
     "flip back fast %": 0.0
    },
    {
     "tf": "1h",
     "type": "AGAINST",
-    "n": 59,
-    "per_week": 2.2692,
-    "hit +1R first %": 47.4576,
-    "hit +2R first %": 27.1186,
-    "random +1R %": 47.662,
-    "random +2R %": 28.1563,
-    "avg R (1:2)": 0.0473,
-    "random R": -0.0357,
-    "median best move (R)": 1.5999,
-    "flip back fast %": 5.0847
+    "n": 60,
+    "per_week": 2.2826,
+    "hit +1R first %": 46.6667,
+    "hit +2R first %": 26.6667,
+    "random +1R %": 47.6081,
+    "random +2R %": 28.1095,
+    "avg R (1:2)": 0.0292,
+    "random R": -0.038,
+    "median best move (R)": 1.5419,
+    "flip back fast %": 5.0
    },
    {
     "tf": "1h",
     "type": "ALL",
-    "n": 102,
-    "per_week": 3.9231,
-    "hit +1R first %": 53.9216,
-    "hit +2R first %": 29.4118,
-    "random +1R %": 47.662,
-    "random +2R %": 28.1563,
-    "avg R (1:2)": 0.1065,
-    "random R": -0.0357,
-    "median best move (R)": 1.6226,
-    "flip back fast %": 8.8235
+    "n": 105,
+    "per_week": 3.9946,
+    "hit +1R first %": 53.3333,
+    "hit +2R first %": 28.5714,
+    "random +1R %": 47.6081,
+    "random +2R %": 28.1095,
+    "avg R (1:2)": 0.0738,
+    "random R": -0.038,
+    "median best move (R)": 1.5999,
+    "flip back fast %": 8.5714
    },
    {
     "tf": "1h",
     "type": "WITH",
-    "n": 43,
-    "per_week": 1.6538,
-    "hit +1R first %": 62.7907,
-    "hit +2R first %": 32.5581,
-    "random +1R %": 47.662,
-    "random +2R %": 28.1563,
-    "avg R (1:2)": 0.1877,
-    "random R": -0.0357,
+    "n": 45,
+    "per_week": 1.712,
+    "hit +1R first %": 62.2222,
+    "hit +2R first %": 31.1111,
+    "random +1R %": 47.6081,
+    "random +2R %": 28.1095,
+    "avg R (1:2)": 0.1333,
+    "random R": -0.038,
     "median best move (R)": 1.701,
-    "flip back fast %": 13.9535
+    "flip back fast %": 13.3333
    },
    {
     "tf": "4h",
     "type": "AGAINST",
     "n": 11,
-    "per_week": 0.4231,
+    "per_week": 0.4185,
     "hit +1R first %": 45.4545,
     "hit +2R first %": 27.2727,
-    "random +1R %": 45.641,
-    "random +2R %": 20.8974,
+    "random +1R %": 46.5823,
+    "random +2R %": 21.1392,
     "avg R (1:2)": 0.0415,
-    "random R": -0.0052,
+    "random R": 0.0109,
     "median best move (R)": 1.1403,
     "flip back fast %": 0.0
    },
    {
     "tf": "4h",
     "type": "ALL",
-    "n": 20,
-    "per_week": 0.7692,
-    "hit +1R first %": 40.0,
-    "hit +2R first %": 20.0,
-    "random +1R %": 45.641,
-    "random +2R %": 20.8974,
-    "avg R (1:2)": -0.1534,
-    "random R": -0.0052,
-    "median best move (R)": 1.0415,
+    "n": 21,
+    "per_week": 0.7989,
+    "hit +1R first %": 38.0952,
+    "hit +2R first %": 19.0476,
+    "random +1R %": 46.5823,
+    "random +2R %": 21.1392,
+    "avg R (1:2)": -0.1533,
+    "random R": 0.0109,
+    "median best move (R)": 0.9494,
     "flip back fast %": 0.0
    },
    {
     "tf": "4h",
     "type": "WITH",
-    "n": 9,
-    "per_week": 0.3462,
-    "hit +1R first %": 33.3333,
-    "hit +2R first %": 11.1111,
-    "random +1R %": 45.641,
-    "random +2R %": 20.8974,
-    "avg R (1:2)": -0.3918,
-    "random R": -0.0052,
-    "median best move (R)": 0.9378,
+    "n": 10,
+    "per_week": 0.3804,
+    "hit +1R first %": 30.0,
+    "hit +2R first %": 10.0,
+    "random +1R %": 46.5823,
+    "random +2R %": 21.1392,
+    "avg R (1:2)": -0.3677,
+    "random R": 0.0109,
+    "median best move (R)": 0.6828,
     "flip back fast %": 0.0
    }
   ]

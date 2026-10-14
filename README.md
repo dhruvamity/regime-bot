@@ -319,12 +319,13 @@ current figures.
 by the median of the last 60. Below 0.75 = QUIET; it switches back at 0.80 so a reading hovering near the line
 doesn't flip every day.
 * It predicts quiet evenings: after a QUIET reading the next 17:00–24:00 IST evening was quiet (movement under 80% of
-  normal) **48%** of the time vs 22% after a NORMAL one (bot data, Mar–Oct 2026, 25 quiet sessions). On PAXG + perp
-  data back to Sep 2023 the split was 42% vs 18%.
+  normal) **48%** of the time vs 22% after a NORMAL one (bot data, Mar–Oct 2026, 25 quiet sessions). The same rule on
+  PAXG + perp data from Sep 2023 (794 sessions, 115 quiet): 43% vs 19%.
 * Far targets get hit less: from any evening 5m close, $16.5 was reached within an hour **38%** of the time in quiet
-  mode vs 45% normally, and $9 73% vs 81%.
+  mode vs 45% normally, and $9 73% vs 81%. Since Sep 2023: $16.5 19% vs 29%, $9 53% vs 68%.
 * What it does **not** show: random entries aiming at $16.5 did not lose more in quiet mode (the stop gets hit less
-  often too). The $9 cap is a hit-rate rule for a quiet market, not a proven expectancy gain. On your own
+  often too). Since Sep 2023 random entries ranked 1:2 > 1:3 > 1:5.5 by a few hundredths of R in both modes alike.
+  The $9 cap is a hit-rate rule for a quiet market, not a proven expectancy gain. On your own
   entries 1:3 was the best target in normal markets; too few of your trades fell in quiet mode to test the cap.
 * The flag lags: it usually switches on 2–3 sessions into a quiet stretch. It flipped 21 times in 156 sessions.
 

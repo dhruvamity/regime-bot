@@ -149,6 +149,9 @@ def _bias_line(bias: dict | None) -> str:
 
 def format_alert(a: Alert, ctx: dict | None = None, stats: dict | None = None) -> str:
     """ctx: optional live context {price, bias:{tf:dir}, move_line}. stats: backtested hit rates."""
+    if a.kind.startswith("SMC_"):
+        from . import smc_alerts
+        return smc_alerts.format_alert(a, (ctx or {}).get("bias_stats"))
     ctx = ctx or {}
     e = lambda x: html.escape(str(x), quote=False)
     price = a.price or ctx.get("price")

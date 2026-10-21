@@ -7,7 +7,8 @@ A local website and Telegram bot that answer one question for an intraday gold t
   shows the 1h/4h/1d bias, live LTF structure, today vs last week, best hours of the day, a 6-week strip and a 6-month
   calendar of daily signals, plus backtest and data-accuracy reports.
 * **Telegram bot**: bold alerts when trade conditions switch on or off and when the 1h trend shifts, plus 4h/1d bias
-  changes and a daily brief. It also tracks **quiet mode**: when the last 2 sessions moved less than 80% of a normal
+  changes and a daily brief. An **SMC bias finder** maps market structure by the rules of the "SMC A to Z" guide on
+  5m, 15m, 1h, 4h, 1d and 1w and messages you the moment a closed candle switches the trend on any of them. It also tracks **quiet mode**: when the last 2 sessions moved less than 80% of a normal
   day, it warns you to cap targets at $9 (1:3 on a $3 stop). Commands: `/status`, `/bias`, `/mode` and more.
 * **Research scripts**: a walk-forward backtest of the signal, a backtest of every alert, a deep week-vs-history
   report, and a check that every timeframe matches the exchange.
@@ -56,7 +57,7 @@ pip install -r requirements.txt
 
 Every later command assumes the venv is active. In a new terminal, run `source .venv/bin/activate` again.
 
-**2.2 Download the full candle history (about 1 minute)**
+**2.2 Download the full candle history (about 1 minute, plus about 4 minutes for the PAXG history)**
 
 ```bash
 python scripts/backfill.py
@@ -64,6 +65,15 @@ python scripts/backfill.py
 
 This downloads every 1-minute XAUUSDT candle since the contract listed (11 Dec 2025) into `data/candles.db`:
 about 440,000 candles, ~25 MB. Re-running it only adds what's missing.
+
+```bash
+python scripts/fetch_paxg.py
+```
+
+This downloads PAXG (a gold-backed token, 1 PAXG = 1 oz) 1-minute candles from Sep 2023 to the perp's listing into
+`data/paxg_1m.parquet` (~30 MB). The SMC bias finder uses it to give the 4h, daily and weekly structure two extra
+years of history, and the bias backtest uses it as an extra test period. Without it, 4h/1d/1w structure starts from
+the perp's first weeks.
 
 **2.3 Build the reports (about 10 seconds)**
 
@@ -139,6 +149,9 @@ restart to hand the bot to a different chat. To allow several chats, list their 
 | `BRIEF_TIME_IST` | `12:00` | Time (IST, HH:MM) of the weekday daily brief. Empty = off. |
 | `TELEGRAM_API_BASE` | `https://api.telegram.org` | For testing against a mock Telegram server only. |
 | `GOLD_STATE_DIR` | `data/` | Where bot/alert state and `alerts.log` live. For testing only. |
+| `BIAS_TREND_TFS` | `5m,15m,1h,4h,1d,1w` | Timeframes that send an SMC trend-switch alert |
+| `BIAS_INTERNAL_TFS` | `1h,4h,1d,1w` | Timeframes that send an SMC internal-shift alert (always silent) |
+| `BIAS_SILENT_TFS` | `5m` | Trend switches on these timeframes arrive silently |
 
 Real environment variables override `.env`. Changes take effect after a restart.
 
@@ -151,6 +164,8 @@ Real environment variables override `.env`. Changes take effect after a restart.
 | 🟡 Tradable (selective) / downgraded | Score moves into the 32–58 band | silent |
 | 🔄 **1H TREND SHIFT** | A closed 1h candle breaks the last swing high/low (BOS/CHoCH), tagged with/against the 4h trend | loud |
 | 🔄 **4H / 1D BIAS CHANGE** | The same on 4h or 1d candles (information, not an entry signal) | loud |
+| 🧭 **SMC TREND → BULLISH / BEARISH** | A closed candle on 5m, 15m, 1h, 4h, 1d or 1w closes beyond its CHoCH point (`gold/bias.py`). Switches at the same candle close are combined into one message | loud (5m silent) |
+| ↪️ **SMC INTERNAL SHIFT** | On 1h, 4h, 1d or 1w: an MSS against the trend (inducement taken with a body close and displacement), or the internal bias back with the trend on the next BOS | silent |
 | 🌙 **QUIET MODE ON** / ☀️ OFF | The 2-session average daily range drops below 80% of the 60-session median (off again at 90%). Checked once per closed session | loud |
 | ⚠️ Feed stalled / ✅ restored | No candles for 3 minutes during market hours, and when they return | loud |
 | ☀️ Daily brief | `BRIEF_TIME_IST` on weekdays | loud |
@@ -158,7 +173,7 @@ Real environment variables override `.env`. Changes take effect after a restart.
 
 Each alert includes the score, price, structure trend on 15m/1h/4h/1d, the time in IST and ET, and the backtested
 hit rate for that alert type, read from `reports/alert_stats.json`. For trend-shift alerts the hit rate is left out
-when the backtest has fewer than 15 examples. Expect roughly **8 loud alerts a week**, plus the weekday brief.
+when the backtest has fewer than 15 examples. Expect roughly **8 loud alerts a week**, plus the weekday brief, plus about 1-2 loud SMC trend switches a week (15m and up) and about 4 silent 5m ones.
 
 **3.4 Commands**
 
@@ -167,6 +182,7 @@ when the backtest has fewer than 15 examples. Expect roughly **8 loud alerts a w
 | `/start` | Subscribe (or resume) and show the current signal |
 | `/status` | Signal right now with reasons |
 | `/bias` | Trend on 15m / 1h / 4h / 1d (market structure + EMA20/50 + ADX) |
+| `/smc` | SMC structure on 5m to 1w: trend, internal bias, the level that flips it (and how far away), the confirmed HH/LL or inducement, which neighbouring timeframes agree, and the 4h/1d/1w candle-to-candle read |
 | `/brief` | The daily brief, right now |
 | `/mode` | Quiet mode check: last 3 daily ranges vs normal, the target cap, and the backtest behind it |
 | `/alerts` | The last 10 alerts sent |
@@ -233,7 +249,10 @@ internet. Telegram works without opening any port.
   Alerts are checked on the same pass, at most once per 15-minute slot and per closed 1h/4h/1d candle.
 * **No repeats:** alert state lives in `data/alert_state.json`. After a restart the bot neither re-sends old alerts
   nor sends anything older than 30 minutes.
-* **Daily:** at 17:00 ET (forex.com daily close) it rebuilds the backtest, week, alert and quiet-mode reports.
+* **Daily:** at 17:00 ET (forex.com daily close) it rebuilds the backtest, week, alert, quiet-mode and SMC bias reports.
+* **SMC structure:** after every newly stored candle it maps 5m to 1w from all candles since the listing (fixed start,
+  4h/1d/1w seeded from PAXG) and sends any switch whose candle closed since the last pass. A candle counts as closed
+  only at its end or its session's close (17:00 ET, early-close holidays, the week's last session), never while forming.
 * **Market hours:** Binance trades XAUUSDT 24/7, but forex.com gold doesn't. Candles outside forex.com hours are
   ignored: Fri 17:00 → Sun 18:00 ET, the 17:00–18:00 ET daily break, Christmas, New Year and Good Friday, plus
   early closes on US holidays. When the market is closed the site doesn't block; it shows the reading from the final
@@ -269,6 +288,10 @@ internet. Telegram works without opening any port.
 | `python scripts/backtest_alerts.py` | ~3 s | `reports/alerts_backtest.md/.json`, `reports/alert_stats.json` | Replays every alert through the bot's own code. **`alert_stats.json` is what the bot quotes in messages** |
 | `python scripts/backtest_regime.py` | ~70 s | `reports/regime_backtest.md/.json` | Replays the quiet-mode flag session by session and judges the next evening (17:00–24:00 IST). **The bot quotes these numbers in `/mode` and quiet-mode alerts** |
 | `python scripts/verify_alerts.py [--days 30]` | ~30 min | `reports/alert_check.md` | Replays the live bot's code at every 15-minute candle close (only the candles it would have had), with a restart and a 3-hour outage, and checks every alert and quiet-mode flip against the backtests: nothing missing, extra, duplicated, late or stale. Exit code 1 on any mismatch |
+| `python scripts/fetch_paxg.py` | ~4 min first time | `data/paxg_1m.parquet` | PAXG 1m history (Sep 2023 to the perp listing) for the SMC finder's 4h/1d/1w seed and the bias backtest |
+| `python scripts/backtest_bias.py` | ~15 s | `reports/bias_backtest.md/.json`, `reports/bias_stats.json`, `reports/bias_flips.csv` | Backtest of the SMC bias finder against the bot's fractal trend and EMA20/50 on every timeframe and period. **`bias_stats.json` is what the bot quotes in SMC alerts** |
+| `python scripts/verify_bias.py [--days 21] [--step 5]` | ~1 h at 5-min steps | `reports/bias_check.md` | Replays the live SMC alert code every few minutes, each step seeing only the candles stored by then, with a restart and a 3-hour outage, and checks every alert against the full-history mapping: nothing missing, extra (repainted), duplicated, late or stale. Exit code 1 on any mismatch |
+| `python scripts/plot_bias.py 1h 2026-01-20 2026-03-30 out.png` | ~3 s | a PNG | Draws the mapped structure (CHoCH point, confirmed HH/LL, inducement, CHoCH/BOS/IDM/MSS events) to check events by eye. Needs `pip install matplotlib` |
 | `python scripts/verify_candles.py` | ~3 s | `reports/candle_check.md` | Checks for missing minutes; stored 1m vs Binance; our 5m/15m/1h vs Binance native klines; our 4h/1d vs Binance 1h aggregated over the same windows. Exit code 1 on any mismatch |
 
 ## 8. HTTP endpoints
@@ -349,6 +372,36 @@ hovering near the line doesn't flip every day.
   once, at the close of the session that caused it. That check caught and fixed a bug where 13:29 ET was treated as
   a session close on every day, not only on early-close days.
 
+**The SMC bias finder** (`gold/bias.py`, added 21 Oct 2026). Structure is mapped candle by candle on closed candles
+by the guide's rules. Swings: a candle that swept the previous candle's low (or high) and turned, with candles inside a
+"mother" candle ignored (ch.2). Inducement: the latest pullback to the left of the current high (ch.7). A high is
+confirmed only once its inducement is taken; no inducement, no BOS; on a BOS (body close beyond the confirmed HH) the
+CHoCH point becomes the lowest point between the HH candle and the BOS candle (ch.8, vertical-line method). A body
+close beyond the CHoCH point is a CHoCH: the trend flips and the new opposite swing is the top (bottom) of the whole
+move (ch.6). The internal bias flips on an MSS (inducement taken with a body close and displacement, ch.7) and comes
+back on the next BOS. 5m-1h come from XAUUSDT only; 4h/1d/1w are seeded with PAXG from Sep 2023. The mapping always
+starts from the same point (the perp listing, plus the seed), so the live bot and the backtest see identical structure.
+
+Backtest (`reports/bias_backtest.md`, 21 Oct 2026). Three periods: PAXG Sep 2023-Dec 2025 (1h and up only: PAXG's thin
+book makes its 1m-15m returns mean-revert, lag-1 autocorrelation -0.10 at 5m vs about 0 on XAUUSDT), XAUUSDT Dec
+2025-May 2026 and Jun-Oct 2026. Compared with the bot's fractal trend and EMA20/50.
+* **No trend read predicts direction reliably.** The next 4 candles' move, long-state minus short-state, is near zero
+  for every method on most timeframes. The 1h structure trend pointed the right way in all three periods but was
+  significant in only one.
+* **Flips.** Only the **15m trend flip (CHoCH)** did better than the same moments traded the other way in both
+  XAUUSDT halves: +1R before -1R 67% vs 33% (24 flips) and 52% vs 44% (27); 1:2 trades +0.22R and +0.13R vs -0.23R
+  and -0.45R the other way, better still when the 1h agreed. 51 flips is too few to call it proven. Every other flip
+  type, including the bot's existing 1h fractal shift, changed sign between periods. Internal (MSS) flips showed no
+  edge on any timeframe.
+* **Clean alerts.** SMC flips almost never reverse within 3 candles (0-2%), against 3-4% for fractal and 8-16% for
+  EMA. Expect about 4 trend switches a week on 5m, 1 on 15m, one every 2-3 months on 1h-1d.
+* **Candle-to-candle rules (ch.12).** Against a driftless random walk from the candle's close, "closed above the
+  previous high, so target the candle's high" beat chance by 0-10 points; "swept the previous high and closed back
+  inside, so target the previous low" lost to chance in nearly every period and timeframe (-1 to -22 points). The
+  guide says these rules only work in context (at a POI), and the data agrees: `/smc` shows them with that warning.
+* So SMC alerts are **bias information, not entry signals**. Each message quotes its timeframe's own backtest, per
+  period, once there are at least 15 flips behind it.
+
 **Candle accuracy** (`reports/candle_check.md`): no missing minutes in 30 days. Stored 1m and our 5m/15m/1h are
 identical to Binance's own candles, and our forex.com-anchored 4h/1d match Binance 1h data aggregated over the same
 windows.
@@ -398,6 +451,8 @@ regime-bot/
 │   ├── alerts.py               Alert rules + Telegram message formatting
 │   ├── alert_runner.py         Persistent live wrapper (no duplicates or stale alerts after restarts)
 │   ├── regime.py               Quiet mode: 2-session range vs normal, target cap, bot texts
+│   ├── bias.py                 SMC bias finder: structure mapping by the guide's rules, timeframes, candle close times
+│   ├── smc_alerts.py           SMC trend / internal-shift alerts, message texts, the /smc map
 │   ├── telegram.py             Telegram client: retrying sender, command polling, owner-only access
 │   └── util.py                 Markdown table helper
 ├── scripts/
@@ -406,6 +461,10 @@ regime-bot/
 │   ├── analyze_week.py         Week vs history report
 │   ├── backtest_alerts.py      Alert backtest + stats the bot quotes
 │   ├── backtest_regime.py      Quiet-mode backtest + stats the bot quotes
+│   ├── fetch_paxg.py           PAXG 1m history for the SMC seed and backtest
+│   ├── backtest_bias.py        SMC bias finder backtest + stats the bot quotes
+│   ├── verify_bias.py          Live SMC alerts replayed against the full-history mapping
+│   ├── plot_bias.py            Draw mapped structure to check by eye
 │   ├── verify_candles.py       Candle accuracy check
 │   └── install_autostart.sh    macOS LaunchAgent installer (zsh)
 ├── server/
@@ -413,6 +472,7 @@ regime-bot/
 │   └── static/index.html       The dashboard (single file)
 ├── data/                       Created at runtime (not committed)
 │   ├── candles.db (+ -wal, -shm)   All 1m candles
+│   ├── paxg_1m.parquet         PAXG 1m history (scripts/fetch_paxg.py)
 │   ├── alert_state.json        Alert engine state
 │   ├── telegram.json           Bot owner, subscribed chats, update offset (only once a token is set)
 │   ├── alerts.log              Every alert ever generated (JSON lines)
@@ -423,6 +483,8 @@ regime-bot/
     ├── week_report.md / .json
     ├── alerts_backtest.md / .json, alert_stats.json
     ├── regime_backtest.md / .json
+    ├── bias_backtest.md / .json, bias_stats.json, bias_flips.csv
+    ├── bias_check.md
     └── candle_check.md
 ```
 

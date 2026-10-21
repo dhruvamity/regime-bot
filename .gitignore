@@ -16,3 +16,7 @@ reports/alerts_backtest.json
 reports/alert_stats.json
 reports/regime_backtest.md
 reports/regime_backtest.json
+reports/bias_backtest.md
+reports/bias_backtest.json
+reports/bias_stats.json
+reports/bias_flips.csv

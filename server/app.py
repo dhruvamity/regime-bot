@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from gold import alerts, env, fetch, live, regime, session, store  # noqa: E402
+from gold import alerts, env, fetch, live, regime, session, smc_alerts, store  # noqa: E402
 from gold.alert_runner import AlertRunner  # noqa: E402
 from gold.config import DATA_DIR, ET, IST, REPORTS_DIR, WS_URL  # noqa: E402
 from gold.telegram import Telegram  # noqa: E402
@@ -93,13 +93,16 @@ def _compute():
     try:
         state, eng = live.build_state(con, return_engine=True)
         new = hub.runner.process(eng)
+        new += hub.runner.smc_process(con)
         ctx = hub.runner.context(eng, state)
+        ctx["bias_stats"] = hub.runner.bias_stats
         msgs = [(alerts.format_alert(a, ctx, hub.runner.stats), a.loud, a.kind) for a in new]
         flip = hub.runner.regime_change(state.get("regime"))
         if flip:
             msgs.append((flip, True, "REGIME"))
         state["recent_alerts"] = hub.runner.history[-15:][::-1]
         state["structure_bias"] = ctx.get("bias")
+        state["smc"] = hub.runner.smc_snap
         return state, msgs, ctx
     finally:
         con.close()
@@ -222,13 +225,14 @@ async def housekeeping_loop():
 
 
 async def regenerate_reports():
-    for script in ("backtest.py", "analyze_week.py", "backtest_alerts.py", "backtest_regime.py"):
+    for script in ("backtest.py", "analyze_week.py", "backtest_alerts.py", "backtest_regime.py", "backtest_bias.py"):
         proc = await asyncio.create_subprocess_exec(sys.executable, str(ROOT / "scripts" / script),
                                                     stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
         _, err = await proc.communicate()
         if proc.returncode:
             log.warning("%s failed: %s", script, err.decode()[-500:])
     hub.runner.stats = AlertRunner.load_stats()
+    hub.runner.bias_stats = smc_alerts.load_stats()
     log.info("reports regenerated")
     hub.dirty.set()
 
@@ -307,12 +311,14 @@ def brief_text() -> str:
 HELP = ("<b>Gold alert bot</b>\n"
         "/status: signal right now (trade / selective / no trade)\n"
         "/bias: trend on 15m · 1h · 4h · 1d\n"
+        "/smc: SMC structure on 5m to 1w (CHoCH levels, IDM, internal bias)\n"
         "/brief: daily brief now\n"
         "/mode: quiet mode check (target cap)\n"
         "/alerts: last alerts sent\n"
         "/stop: pause alerts · /start: resume\n\n"
         "You get: 🟢 TRADE conditions ON, 🔴 STOP, 🔄 1h trend shifts, 4h/1d bias changes (loud); "
-        "🌙 quiet mode on/off (loud); 🟡 selective/downgrade (silent).")
+        "🌙 quiet mode on/off (loud); 🟡 selective/downgrade (silent); "
+        "🧭 SMC trend switch on any timeframe (loud, 5m silent); ↪️ SMC internal shift on 1h+ (silent).")
 
 
 async def handle_command(chat: int, cmd: str, args: list[str]) -> str | None:
@@ -332,6 +338,8 @@ async def handle_command(chat: int, cmd: str, args: list[str]) -> str | None:
         return bias_text()
     if cmd == "/brief":
         return brief_text()
+    if cmd == "/smc":
+        return smc_alerts.map_text(hub.runner.smc_snap)
     if cmd == "/mode":
         return regime.detail_text(hub.state.get("regime")) if hub.state else "Still loading."
     if cmd == "/alerts":
@@ -354,6 +362,7 @@ async def telegram_start():
             await tg._call("setMyCommands", commands=[
                 {"command": "status", "description": "Trade or not, right now"},
                 {"command": "bias", "description": "Trend on 15m/1h/4h/1d"},
+                {"command": "smc", "description": "SMC structure on 5m to 1w"},
                 {"command": "brief", "description": "Daily brief"},
                 {"command": "mode", "description": "Quiet mode check (target cap)"},
                 {"command": "alerts", "description": "Last alerts"},
@@ -372,7 +381,7 @@ async def lifespan(app: FastAPI):
     n = await asyncio.to_thread(_backfill)
     log.info("startup backfill: %d candles", n)
     stale = [p for p in (REPORTS_DIR / "backtest.json", REPORTS_DIR / "week_report.json", REPORTS_DIR / "alert_stats.json",
-                         REPORTS_DIR / "regime_backtest.json")
+                         REPORTS_DIR / "regime_backtest.json", REPORTS_DIR / "bias_stats.json")
              if not p.exists() or time.time() - p.stat().st_mtime > 20 * 3600]
     if stale:
         await regenerate_reports()

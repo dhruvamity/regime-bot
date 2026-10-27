@@ -1,6 +1,6 @@
 # Candle accuracy check
 
-Run 12 Oct 2026 20:43 IST against Binance USD-M REST.
+Run 21 Oct 2026 11:08 IST against Binance USD-M REST.
 
 ## 1. Missing 1m candles (last 30 days)
 

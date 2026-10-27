@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import alerts, regime, trend
+from . import alerts, bias, regime, smc_alerts, store, trend
 from .config import DATA_DIR, REPORTS_DIR
 
 STALE_MIN = 30          # never send an alert about something older than this (e.g. after downtime)
@@ -29,7 +29,14 @@ class AlertRunner:
         self.last_shift = pd.Timestamp(st["last_shift"]) if st.get("last_shift") else None
         self.history: list[dict] = st.get("history", [])
         self.regime: dict | None = st.get("regime")   # {"mode", "session"} last seen quiet-mode reading
+        self.last_bias = pd.Timestamp(st["last_bias"]) if st.get("last_bias") else None
         self.stats = self.load_stats()
+        self.bias_stats = smc_alerts.load_stats()
+        self.bias_cfg = smc_alerts.settings()
+        self.smc_snap: dict = {}
+        self._smc_key = None          # (last stored 1m ts) the cached structure maps were built from
+        self._smc_maps: dict = {}
+        self._smc_last: pd.Timestamp | None = None
 
     @staticmethod
     def load_stats() -> dict:
@@ -46,6 +53,7 @@ class AlertRunner:
             "last_shift": self.last_shift.isoformat() if self.last_shift is not None else None,
             "history": self.history[-200:],
             "regime": self.regime,
+            "last_bias": self.last_bias.isoformat() if self.last_bias is not None else None,
         }, indent=1, default=str))
 
     def context(self, eng, state: dict | None) -> dict:
@@ -79,6 +87,36 @@ class AlertRunner:
                              "tf": None, "dir": None, "score": None, "tag": None, "loud": True, "sent_at": time.time()})
         self.save()
         return regime.alert_text(r)
+
+    def smc_maps(self, con, as_of: pd.Timestamp | None = None) -> tuple[dict, pd.Timestamp | None]:
+        """Structure maps on every timeframe from ALL candles since the listing (fixed start), rebuilt only when a
+        new candle is stored. `as_of` replays an earlier moment (scripts/verify_bias.py)."""
+        key = (store.last_ts(con), as_of)
+        if key != self._smc_key:
+            fr, last = bias.load_frames(con, as_of)
+            self._smc_maps, self._smc_last, self._smc_key = bias.build(fr, last), last, key
+            self.smc_snap = bias.snapshot_from(self._smc_maps)
+        return self._smc_maps, self._smc_last
+
+    def smc_process(self, con, now: pd.Timestamp | None = None, as_of: pd.Timestamp | None = None) -> list[alerts.Alert]:
+        """SMC trend / internal switches on any timeframe, from candles that closed since the last call."""
+        now = now or pd.Timestamp.now(tz="UTC")
+        maps, last = self.smc_maps(con, as_of)
+        if not maps or last is None:
+            return []
+        if self.last_bias is None:          # first run: adopt the current structure silently
+            self.last_bias = last
+            self.save()
+            return []
+        out = smc_alerts.alerts_between(maps, self.last_bias, last, self.bias_cfg) if last > self.last_bias else []
+        self.last_bias = max(self.last_bias, last)
+        fresh = smc_alerts.merge([a for a in out if a.time >= now - pd.Timedelta(minutes=STALE_MIN)])
+        for a in fresh:
+            self.history.append({"time": a.time.isoformat(), "kind": a.kind, "tf": a.tf, "dir": a.direction,
+                                 "score": None, "tag": a.tag, "loud": a.loud, "sent_at": time.time(),
+                                 "also": a.data.get("also", [])})
+        self.save()
+        return fresh
 
     def process(self, eng, now: pd.Timestamp | None = None) -> list[alerts.Alert]:
         now = now or pd.Timestamp.now(tz="UTC")
